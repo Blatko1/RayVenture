@@ -12,24 +12,23 @@ mod voxel;
 use std::time::{Duration, Instant};
 
 use canvas::Canvas;
-use map::Map;
 use pollster::block_on;
 use state::State;
 use winit::{
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{ElementState, Event, WindowEvent, KeyEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder as WinitWindowBuilder,
+    window::WindowBuilder as WinitWindowBuilder, keyboard::{Key, NamedKey},
 };
 
 const FPS: u32 = 60;
-
+// TODO replace unwraps from all around
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "error");
     }
     env_logger::init();
 
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new().unwrap();
     let winit_window = WinitWindowBuilder::new().build(&event_loop).unwrap();
     winit_window.set_title("False Space");
 
@@ -45,48 +44,9 @@ fn main() {
     let mut framerate = 0;
     let mut fps_avg = 0;
 
-    event_loop.run(move |event, _, control| {
+    event_loop.run(move |event, elwt| {
         match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested | WindowEvent::Destroyed => {
-                    *control = ControlFlow::Exit
-                }
-                WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            state: ElementState::Pressed,
-                            virtual_keycode: Some(VirtualKeyCode::Escape),
-                            ..
-                        },
-                    ..
-                } => *control = ControlFlow::Exit,
-                WindowEvent::KeyboardInput { input, .. } => {
-                    state.process_keyboard_input(input)
-                }
-                WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    state.resize(*new_inner_size);
-                }
-                WindowEvent::Resized(new_size) => state.resize(new_size),
-                _ => (),
-            },
-            Event::DeviceEvent { event, .. } => {
-                state.process_mouse_input(event)
-            }
-            Event::RedrawRequested(..) => {
-                state.update();
-
-                match state.render() {
-                    Ok(_) => (),
-                    Err(wgpu::SurfaceError::Lost) => state.on_surface_lost(),
-                    // The system is out of memory, we should probably quit
-                    Err(wgpu::SurfaceError::OutOfMemory) => {
-                        *control = ControlFlow::Exit
-                    }
-                    // All other errors (Outdated, Timeout) should be resolved by the next frame
-                    Err(e) => eprintln!("{:?}", e),
-                }
-            }
-            Event::MainEventsCleared => {
+            Event::NewEvents(start_cause) => {
                 let elapsed = time_delta.elapsed();
 
                 if framerate_delta <= elapsed {
@@ -105,22 +65,49 @@ fn main() {
                         fps_avg = 0;
                     }
                 } else {
-                    *control = ControlFlow::WaitUntil(
-                        Instant::now() + framerate_delta - elapsed,
-                    );
+                    elwt.set_control_flow(ControlFlow::WaitUntil(Instant::now() + framerate_delta - elapsed,))
                 }
-                //if fps_update_delta.elapsed().as_millis() >= 1000 {
-                //    println!("avg frame time: {}, FPS: {}", fps_avg as f64 / framerate as f64, framerate);
-                //    fps_update_delta = Instant::now();
-                //    framerate = 0;
-                //    fps_avg = 0;
-                //}
-                //framerate += 1;
-                //fps_avg += time_delta.elapsed().as_micros();
-                //time_delta = Instant::now();
             }
-            Event::LoopDestroyed => println!("Exited!"),
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested | WindowEvent::Destroyed => {
+                    println!("exit reason: {:?}", event);
+                    elwt.exit()
+                }
+                WindowEvent::KeyboardInput {
+                    event: KeyEvent {
+                        logical_key: Key::Named(NamedKey::Escape),
+                        ..
+                    },
+                    ..
+                } => elwt.exit(),
+                WindowEvent::KeyboardInput { event, .. } => {
+                    state.process_keyboard_input(event)
+                }
+                WindowEvent::ScaleFactorChanged { inner_size_writer, .. } => {
+                    println!("resizings!!!!");
+                }
+                WindowEvent::Resized(new_size) => state.resize(new_size),
+                WindowEvent::RedrawRequested => {
+                    state.update();
+
+                match state.render() {
+                    Ok(_) => (),
+                    Err(wgpu::SurfaceError::Lost) => state.on_surface_lost(),
+                    // The system is out of memory, we should probably quit
+                    Err(wgpu::SurfaceError::OutOfMemory) => {
+                        elwt.exit()
+                    }
+                    // All other errors (Outdated, Timeout) should be resolved by the next frame
+                    Err(e) => eprintln!("{:?}", e),
+                }
+                }
+                _ => (),
+            },
+            Event::DeviceEvent { event, .. } => {
+                state.process_mouse_input(event)
+            }
+            Event::LoopExiting => println!("Exited!"),
             _ => (),
         }
-    });
+    }).unwrap();
 }

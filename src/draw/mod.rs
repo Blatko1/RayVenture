@@ -6,7 +6,7 @@ mod wall;
 
 use glam::Vec3;
 use std::f32::consts::{PI, TAU};
-use winit::event::{DeviceEvent, ElementState, KeyboardInput, VirtualKeyCode};
+use winit::{event::{DeviceEvent, ElementState, KeyboardInput, VirtualKeyCode, KeyEvent}, keyboard::{Key, NamedKey, SmolStr}, platform::modifier_supplement::KeyEventExtModifierSupplement};
 
 use crate::voxel::{VoxelModelManager, VoxelModelRef};
 
@@ -387,42 +387,47 @@ impl Raycaster {
         }
     }
 
-    pub fn process_keyboard_input(&mut self, event: KeyboardInput) {
-        if let Some(key) = event.virtual_keycode {
-            let value = match event.state {
-                ElementState::Pressed => 1.0,
-                ElementState::Released => 0.0,
-            };
-
-            match key {
-                // Turn left:
-                VirtualKeyCode::Q => self.turn_left = value,
-                // Turn right:
-                VirtualKeyCode::E => self.turn_right = value,
-                // Move forward:
-                VirtualKeyCode::W => self.forward = value,
-                // Move backward:
-                VirtualKeyCode::S => self.backward = value,
-                // Strafe left:
-                VirtualKeyCode::A => self.strafe_left = value,
-                // Strafe right:
-                VirtualKeyCode::D => self.strafe_right = value,
+    pub fn process_keyboard_input(&mut self, event: KeyEvent) {
+        let value = match event.state {
+            ElementState::Pressed => 1.0,
+            ElementState::Released => 0.0,
+        };
+        match event.key_without_modifiers().as_ref() {
+            Key::Named(key) => match key {
                 // Increase FOV:
-                VirtualKeyCode::Up => self.increase_fov = value,
+                NamedKey::ArrowUp => self.increase_fov = value,
                 // Increase FOV:
-                VirtualKeyCode::Down => self.decrease_fov = value,
+                NamedKey::ArrowDown => self.decrease_fov = value,
                 // Look more up (y_shearing):
-                VirtualKeyCode::PageUp => self.increase_y_shearing = value,
+                NamedKey::PageUp => self.increase_y_shearing = value,
                 // Look more down (y_shearing):
-                VirtualKeyCode::PageDown => self.decrease_y_shearing = value,
+                NamedKey::PageDown => self.decrease_y_shearing = value,
                 // Reset look (y_shearing):
-                VirtualKeyCode::Home => self.y_shearing = 0.0,
+                NamedKey::Home => self.y_shearing = 0.0,
                 // Reset look (y_shearing):
-                VirtualKeyCode::Space => self.fly_up = value,
+                NamedKey::Space => self.fly_up = value,
                 // Reset look (y_shearing):
-                VirtualKeyCode::LShift => self.fly_down = value,
-                _ => (),
-            }
+                NamedKey::Shift => self.fly_down = value,
+                _ => println!("pressed unknown: {:?}", key)
+            },
+            Key::Character(char) => {
+                match char {
+                    // Turn left:
+                    "q" => self.turn_left = value,
+                    // Turn right:
+                    "e" => self.turn_right = value,
+                    // Move forward:
+                    "w" => self.forward = value,
+                    // Move backward:
+                    "s" => self.backward = value,
+                    // Strafe left:
+                    "a" => self.strafe_left = value,
+                    // Strafe right:
+                    "d" => self.strafe_right = value,
+                    _ => println!("pressed unknown: {}", char),
+                }
+            },
+            _ => ()
         }
     }
 }

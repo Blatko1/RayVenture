@@ -1,4 +1,4 @@
-use winit::{dpi::PhysicalSize, window::Window as WinitWindow};
+use winit::{dpi::PhysicalSize, window::Window as WinitWindow, raw_window_handle::HasDisplayHandle};
 
 pub struct Gfx {
     surface: wgpu::Surface,
@@ -18,7 +18,7 @@ impl Gfx {
             dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
         });
 
-        let surface = unsafe { instance.create_surface(&winit_window) }?;
+        let surface = unsafe { instance.create_surface(&winit_window.display_handle().unwrap()) }?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
